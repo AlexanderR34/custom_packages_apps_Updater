@@ -9,7 +9,6 @@ import android.app.Activity
 import android.content.Intent
 import android.os.PowerManager
 import androidx.compose.ui.text.AnnotatedString
-import androidx.core.net.toUri
 import net.pixelos.ota.R
 import net.pixelos.ota.UpdaterApplication
 import net.pixelos.ota.controller.UpdaterController
@@ -158,10 +157,6 @@ class UpdateActionHandler(
             )
 
             UpdateActionType.EXPORT -> exportUpdate(update)
-
-            UpdateActionType.VIEW_DOWNLOADS -> update.downloadUrl?.let { url ->
-                activity.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
-            }
 
             UpdateActionType.REBOOT ->
                 activity.getSystemService(PowerManager::class.java).reboot(null)

@@ -114,7 +114,6 @@
     <string name="menu_incremental_updates_summary">Download a smaller delta update when available. Disable to always download the full update.</string>
     <string name="menu_delete_update">Delete</string>
     <string name="menu_export_update">Export update</string>
-    <string name="menu_view_downloads">View on <xliff:g id="brand_name" example="PixelOS">%1$s</xliff:g> Downloads</string>
     <string name="menu_metered_network_warning">Metered network warning</string>
     <string name="menu_metered_network_warning_summary">Warn before downloading over mobile data</string>
     <string name="menu_ab_perf_mode">Prioritize update process</string>

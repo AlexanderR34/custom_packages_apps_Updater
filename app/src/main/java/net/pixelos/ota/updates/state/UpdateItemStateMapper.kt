@@ -159,9 +159,6 @@ class UpdateItemStateMapper(
                 if (state.canDelete) {
                     add(action(type = UpdateActionType.DELETE, enabled = !state.isBusy))
                 }
-                if (update.downloadUrl != null) {
-                    add(action(UpdateActionType.VIEW_DOWNLOADS))
-                }
             },
         )
 
