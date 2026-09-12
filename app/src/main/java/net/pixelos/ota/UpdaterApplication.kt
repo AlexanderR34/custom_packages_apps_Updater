@@ -47,6 +47,7 @@ class UpdaterApplication : Application() {
             notificationHelper = notificationHelper,
             networkDataSource = networkDataSource,
             localDataSource = localDataSource,
+            userPreferencesRepository = userPreferencesRepository,
         )
     }
 
@@ -56,6 +57,9 @@ class UpdaterApplication : Application() {
         notificationHelper.setUpNotificationChannels()
         coroutineScope.launch {
             userPreferencesRepository.migrateLegacyPreferences()
+        }
+        coroutineScope.launch {
+            updatesRepository.pruneInstalledUpdates()
         }
         SpaEnvironmentFactory.reset(object : SpaEnvironment(applicationContext) {
             override val pageProviderRepository = lazy {

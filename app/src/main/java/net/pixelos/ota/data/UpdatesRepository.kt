@@ -32,6 +32,7 @@ class UpdatesRepository(
     private val notificationHelper: NotificationHelper,
     private val networkDataSource: UpdatesNetworkDataSource,
     private val localDataSource: UpdatesLocalDataSource,
+    private val userPreferencesRepository: UserPreferencesRepository,
 ) {
     fun observeLocalUpdates(): Flow<List<Update>> = localDataSource.observeUpdates()
 
@@ -89,6 +90,25 @@ class UpdatesRepository(
         }
 
         return System.currentTimeMillis()
+    }
+
+    /**
+     * Removes stored updates that are not newer than the running build. Their packages are only
+     * deleted when auto-delete is on.
+     */
+    suspend fun pruneInstalledUpdates() {
+        if (DeviceInfoUtils.isDowngradingAllowed) return
+
+        val deletePackages = userPreferencesRepository.getAutoDelete()
+        withContext(Dispatchers.IO) {
+            localDataSource.getUpdates()
+                .filter { it.timestamp <= DeviceInfoUtils.buildDateTimestamp }
+                .forEach {
+                    Log.d(TAG, "${it.name} is already installed, removing")
+                    if (deletePackages) it.file?.delete()
+                    localDataSource.removeUpdate(it.downloadId)
+                }
+        }
     }
 
     private fun persistIncrementalLinks(network: List<NetworkUpdate>) {
