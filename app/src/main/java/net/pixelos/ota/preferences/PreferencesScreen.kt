@@ -80,7 +80,6 @@ private fun PreferencesContent(
     )
     val autoDelete by repository.autoDeleteFlow.collectAsStateWithLifecycle(true)
     val streamUpdates by repository.streamUpdatesFlow.collectAsStateWithLifecycle(true)
-    val incrementalUpdates by repository.incrementalUpdatesFlow.collectAsStateWithLifecycle(true)
     val checkInterval by repository.checkIntervalFlow.collectAsStateWithLifecycle(CheckInterval.default)
     val meteredNetworkWarning by repository.meteredNetworkWarningFlow.collectAsStateWithLifecycle(
         true
@@ -91,7 +90,6 @@ private fun PreferencesContent(
     val autoUpdatesCheckSummary = stringResource(R.string.menu_auto_updates_check_summary)
     val autoDeleteUpdatesSummary = stringResource(R.string.menu_auto_delete_updates_summary)
     val streamUpdatesSummary = stringResource(R.string.menu_stream_updates_summary)
-    val incrementalUpdatesSummary = stringResource(R.string.menu_incremental_updates_summary)
     val meteredNetworkWarningSummary = stringResource(R.string.menu_metered_network_warning_summary)
     val abPerfModeSummary = stringResource(R.string.menu_ab_perf_mode_summary)
     val abPerfModeChargingSummary = stringResource(R.string.menu_ab_perf_mode_summary_charging)
@@ -143,15 +141,6 @@ private fun PreferencesContent(
 
     Category(title = stringResource(R.string.pref_category_download_install)) {
         if (isABDevice) {
-            SwitchPreference(object : SwitchPreferenceModel {
-                override val title = stringResource(R.string.menu_incremental_updates)
-                override val summary = { incrementalUpdatesSummary }
-                override val checked = { incrementalUpdates }
-                override val onCheckedChange: (Boolean) -> Unit = { value ->
-                    coroutineScope.launch { repository.setIncrementalUpdates(value) }
-                }
-            })
-
             SwitchPreference(object : SwitchPreferenceModel {
                 override val title = stringResource(R.string.menu_stream_updates)
                 override val summary = { streamUpdatesSummary }

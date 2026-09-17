@@ -110,8 +110,6 @@
     <string name="menu_auto_delete_updates_summary">Remove downloaded updates after installation</string>
     <string name="menu_stream_updates">Stream online updates</string>
     <string name="menu_stream_updates_summary">Install updates while downloading. Disable to save update packages for export.</string>
-    <string name="menu_incremental_updates">Incremental updates</string>
-    <string name="menu_incremental_updates_summary">Download a smaller delta update when available. Disable to always download the full update.</string>
     <string name="menu_delete_update">Delete</string>
     <string name="menu_export_update">Export update</string>
     <string name="menu_metered_network_warning">Metered network warning</string>

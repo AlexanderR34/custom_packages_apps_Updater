@@ -32,7 +32,6 @@ class UpdatesRepository(
     private val notificationHelper: NotificationHelper,
     private val networkDataSource: UpdatesNetworkDataSource,
     private val localDataSource: UpdatesLocalDataSource,
-    private val userPreferencesRepository: UserPreferencesRepository,
 ) {
     fun observeLocalUpdates(): Flow<List<Update>> = localDataSource.observeUpdates()
 
@@ -50,13 +49,10 @@ class UpdatesRepository(
 
         val networkUpdates = withContext(Dispatchers.IO) {
             val network = networkDataSource.fetchUpdates()
-            val incrementalUpdatesEnabled = userPreferencesRepository.getIncrementalUpdates()
-            persistIncrementalLinks(if (incrementalUpdatesEnabled) network else emptyList())
+            persistIncrementalLinks(network)
             val deltaUrls = network.mapNotNull { it.incremental?.firstOrNull()?.url }.toSet()
-            network.flatMap { update ->
-                val incremental = update.toIncrementalUpdate().takeIf { incrementalUpdatesEnabled }
-                listOfNotNull(update.toUpdate(), incremental)
-            }.filter { filterUpdates(it, deltaUrls) }
+            network.flatMap { listOfNotNull(it.toUpdate(), it.toIncrementalUpdate()) }
+                .filter { filterUpdates(it, deltaUrls) }
         }
 
         val networkIds = networkUpdates.map { it.downloadId }.toSet()

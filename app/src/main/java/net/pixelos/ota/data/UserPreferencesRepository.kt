@@ -37,7 +37,6 @@ private object UserPreferencesKeys {
     val AB_PERF_MODE = booleanPreferencesKey("ab_perf_mode")
     val AUTO_DELETE = booleanPreferencesKey("auto_delete_updates")
     val CHECK_INTERVAL = stringPreferencesKey("check_interval")
-    val INCREMENTAL_UPDATES = booleanPreferencesKey("incremental_updates")
     val METERED_NETWORK_WARNING = booleanPreferencesKey("metered_network_warning")
     val PERIODIC_CHECK_ENABLED = booleanPreferencesKey("periodic_check_enabled")
     val STREAM_UPDATES = booleanPreferencesKey("stream_updates")
@@ -119,16 +118,6 @@ class UserPreferencesRepository(context: Context) {
 
     suspend fun setAutoDelete(value: Boolean) {
         userPreferences.edit { it[UserPreferencesKeys.AUTO_DELETE] = value }
-    }
-
-    val incrementalUpdatesFlow: Flow<Boolean> = userPreferencesFlow.map { preferences ->
-        preferences[UserPreferencesKeys.INCREMENTAL_UPDATES] ?: true
-    }
-
-    suspend fun getIncrementalUpdates(): Boolean = incrementalUpdatesFlow.first()
-
-    suspend fun setIncrementalUpdates(value: Boolean) {
-        userPreferences.edit { it[UserPreferencesKeys.INCREMENTAL_UPDATES] = value }
     }
 
     val meteredNetworkWarningFlow: Flow<Boolean> = userPreferencesFlow.map { preferences ->
