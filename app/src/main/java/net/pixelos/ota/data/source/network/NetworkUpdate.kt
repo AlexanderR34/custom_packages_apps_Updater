@@ -47,12 +47,12 @@ data class NetworkUpdateFile(
     @SerialName("url") val url: String,
 )
 
-private data class PackageFileRange(
+data class PackageFileRange(
     val offset: Long,
     val size: Long,
 )
 
-private fun String.parsePackageFileRanges(packageSize: Long) =
+fun String.parsePackageFileRanges(packageSize: Long) =
     split(",").associate { token ->
         val parts = token.trim().split(":", limit = 3)
         require(parts.size == 3) { "Malformed ota_property_files entry: $token" }
