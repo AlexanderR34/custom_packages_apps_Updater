@@ -6,6 +6,7 @@
 <permissions>
     <privapp-permissions package="net.pixelos.ota">
         <permission name="android.permission.ACCESS_CACHE_FILESYSTEM"/>
+        <permission name="android.permission.INSTALL_PACKAGES"/>
         <permission name="android.permission.MANAGE_USERS" />
         <permission name="android.permission.REBOOT"/>
         <permission name="android.permission.RECOVERY"/>
