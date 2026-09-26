@@ -109,7 +109,7 @@ data class UpdateOperationState(
                 isBusy = controller.isBusy,
                 isFullyDownloaded = isLocal || isFullyDownloaded,
                 installBlockedReason = installBlockedReason,
-                canInstall = installBlockedReason == InstallUtils.BlockedReason.NONE,
+                canInstall = isLocal || installBlockedReason == InstallUtils.BlockedReason.NONE,
                 canExport = phase == UpdateOperationPhase.VERIFIED && !isLocal,
                 canDelete = canDelete,
             )

@@ -86,13 +86,13 @@ class UpdateItemStateMapper(
 
             UpdateOperationPhase.VERIFIED -> ActionButtons(
                 primary = when {
-                    state.requiresManualInstall -> action(
-                        type = UpdateActionType.SHOW_INFO,
-                    )
-
                     state.canInstall -> action(
                         type = UpdateActionType.START_INSTALL,
                         enabled = !state.isBusy,
+                    )
+
+                    state.requiresManualInstall -> action(
+                        type = UpdateActionType.SHOW_INFO,
                     )
 
                     state.canDelete -> action(
@@ -101,10 +101,16 @@ class UpdateItemStateMapper(
                     )
 
                     else -> action(
-                        type = UpdateActionType.SHOW_INFO,
+                        type = UpdateActionType.START_INSTALL,
                         enabled = !state.isBusy,
                     )
                 },
+                secondary = if (state.canDelete && (state.canInstall || state.requiresManualInstall)) {
+                    action(
+                        type = UpdateActionType.DELETE,
+                        enabled = !state.isBusy,
+                    )
+                } else null,
             )
 
             UpdateOperationPhase.INSTALLING_RECOVERY -> ActionButtons(

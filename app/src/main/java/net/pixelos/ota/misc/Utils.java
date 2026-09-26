@@ -46,33 +46,147 @@ public class Utils {
     }
 
     /**
-     * Get the offset to the compressed data of a file inside the given zip
+     * Get the exact byte offset to the uncompressed payload data of an entry inside the given zip file.
      *
      * @param zipFile input zip file
      * @param entryPath full path of the entry
-     * @return the offset of the compressed, or -1 if not found
+     * @return the offset of the uncompressed data in bytes
      * @throws IllegalArgumentException if the given entry is not found
      */
     public static long getZipEntryOffset(ZipFile zipFile, String entryPath) {
-        // Each entry has an header of (30 + n + m) bytes
-        // 'n' is the length of the file name
-        // 'm' is the length of the extra field
-        final int FIXED_HEADER_SIZE = 30;
-        Enumeration<? extends ZipEntry> zipEntries = zipFile.entries();
-        long offset = 0;
-        while (zipEntries.hasMoreElements()) {
-            ZipEntry entry = zipEntries.nextElement();
-            int n = entry.getName().length();
-            int m = entry.getExtra() == null ? 0 : entry.getExtra().length;
-            int headerSize = FIXED_HEADER_SIZE + n + m;
-            offset += headerSize;
-            if (entry.getName().equals(entryPath)) {
-                return offset;
-            }
-            offset += entry.getCompressedSize();
+        long off = getZipEntryOffsetFromMetadata(zipFile, entryPath);
+        if (off > 0) {
+            return off;
         }
-        Log.e(TAG, "Entry " + entryPath + " not found");
-        throw new IllegalArgumentException("The given entry was not found");
+        return getZipEntryOffset(new File(zipFile.getName()), entryPath);
+    }
+
+    /**
+     * Get the exact byte offset to the uncompressed payload data of an entry inside the given zip file.
+     *
+     * @param file input file
+     * @param entryPath full path of the entry
+     * @return the offset of the uncompressed data in bytes
+     * @throws IllegalArgumentException if the given entry is not found
+     */
+    public static long getZipEntryOffset(File file, String entryPath) {
+        try (ZipFile zipFile = new ZipFile(file)) {
+            long off = getZipEntryOffsetFromMetadata(zipFile, entryPath);
+            if (off > 0) {
+                return off;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Could not get offset from metadata: " + e.getMessage());
+        }
+
+        try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(file, "r")) {
+            long len = raf.length();
+            if (len < 22) {
+                throw new IllegalArgumentException("File too short to be a valid ZIP");
+            }
+
+            long searchLimit = Math.max(0, len - 65557);
+            long eocdOffset = -1;
+            for (long pos = len - 22; pos >= searchLimit; pos--) {
+                raf.seek(pos);
+                if (readIntLE(raf) == 0x06054b50L) {
+                    eocdOffset = pos;
+                    break;
+                }
+            }
+
+            if (eocdOffset == -1) {
+                throw new IllegalArgumentException("EOCD record not found in ZIP");
+            }
+
+            raf.seek(eocdOffset + 10);
+            int totalEntries = readShortLE(raf);
+            raf.seek(eocdOffset + 16);
+            long cdOffset = readIntLE(raf);
+
+            raf.seek(cdOffset);
+            for (int i = 0; i < totalEntries; i++) {
+                long currentPos = raf.getFilePointer();
+                long sig = readIntLE(raf);
+                if (sig != 0x02014b50L) {
+                    break;
+                }
+
+                raf.seek(currentPos + 28);
+                int fnLen = readShortLE(raf);
+                int extraLen = readShortLE(raf);
+                int commentLen = readShortLE(raf);
+
+                raf.seek(currentPos + 42);
+                long localHeaderOffset = readIntLE(raf);
+
+                byte[] fnBytes = new byte[fnLen];
+                raf.readFully(fnBytes);
+                String name = new String(fnBytes, java.nio.charset.StandardCharsets.UTF_8);
+
+                if (name.equals(entryPath)) {
+                    raf.seek(localHeaderOffset);
+                    long localSig = readIntLE(raf);
+                    if (localSig != 0x04034b50L) {
+                        throw new IllegalArgumentException("Invalid Local File Header signature at offset " + localHeaderOffset);
+                    }
+
+                    raf.seek(localHeaderOffset + 26);
+                    int localFnLen = readShortLE(raf);
+                    int localExtraLen = readShortLE(raf);
+
+                    return localHeaderOffset + 30 + localFnLen + localExtraLen;
+                }
+
+                raf.seek(currentPos + 46 + fnLen + extraLen + commentLen);
+            }
+        } catch (java.io.IOException e) {
+            Log.e(TAG, "Error parsing ZIP structure for " + entryPath, e);
+        }
+
+        Log.e(TAG, "Entry " + entryPath + " not found in " + file);
+        throw new IllegalArgumentException("The given entry was not found: " + entryPath);
+    }
+
+    private static long getZipEntryOffsetFromMetadata(ZipFile zipFile, String entryPath) {
+        ZipEntry metadataEntry = zipFile.getEntry("META-INF/com/android/metadata");
+        if (metadataEntry != null) {
+            try (java.io.InputStream is = zipFile.getInputStream(metadataEntry);
+                 java.io.InputStreamReader isr = new java.io.InputStreamReader(is, java.nio.charset.StandardCharsets.UTF_8);
+                 java.io.BufferedReader br = new java.io.BufferedReader(isr)) {
+                for (String line; (line = br.readLine()) != null;) {
+                    if (line.startsWith("ota-property-files=")) {
+                        String[] entries = line.substring("ota-property-files=".length()).split(",");
+                        for (String e : entries) {
+                            String[] parts = e.trim().split(":");
+                            if (parts.length >= 2 && parts[0].equals(entryPath)) {
+                                long off = Long.parseLong(parts[1]);
+                                if (off > 0) {
+                                    return off;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Failed reading ota-property-files: " + e.getMessage());
+            }
+        }
+        return -1;
+    }
+
+    private static int readShortLE(java.io.RandomAccessFile raf) throws java.io.IOException {
+        int b1 = raf.readUnsignedByte();
+        int b2 = raf.readUnsignedByte();
+        return (b2 << 8) | b1;
+    }
+
+    private static long readIntLE(java.io.RandomAccessFile raf) throws java.io.IOException {
+        long b1 = raf.readUnsignedByte();
+        long b2 = raf.readUnsignedByte();
+        long b3 = raf.readUnsignedByte();
+        long b4 = raf.readUnsignedByte();
+        return (b4 << 24) | (b3 << 16) | (b2 << 8) | b1;
     }
 
     public static void removeUncryptFiles(File downloadPath) {

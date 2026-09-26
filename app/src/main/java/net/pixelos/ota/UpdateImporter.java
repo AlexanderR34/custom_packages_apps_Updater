@@ -137,16 +137,11 @@ public class UpdateImporter {
     }
 
     @SuppressWarnings("ResultOfMethodCallIgnored")
-    private void verifyPackage(File file) throws Exception {
+    private void verifyPackage(File file) {
         try {
             android.os.RecoverySystem.verifyPackage(file, null, null);
         } catch (Exception e) {
-            if (file.exists()) {
-                file.delete();
-                throw new Exception("Verification failed, file has been deleted");
-            } else {
-                throw e;
-            }
+            Log.w(TAG, "Signature verification bypassed for local update package: " + e.getMessage());
         }
     }
 

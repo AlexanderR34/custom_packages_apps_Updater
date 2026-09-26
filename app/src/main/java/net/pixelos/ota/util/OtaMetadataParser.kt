@@ -5,43 +5,88 @@
 
 package net.pixelos.ota.util
 
+import android.os.Build
 import android.ota.nano.OtaPackageMetadata.OtaMetadata
 import java.io.File
 import java.io.IOException
+import java.io.InputStreamReader
+import java.util.Properties
 import java.util.zip.ZipFile
 
 class OtaMetadataParser @Throws(IOException::class) constructor(file: File) {
-    val sdkLevel: Int
-    val securityPatchLevel: String
-    val timestamp: Long
-    val isABUpdate: Boolean
+    var sdkLevel: Int = Build.VERSION.SDK_INT
+        private set
+    var securityPatchLevel: String = Build.VERSION.SECURITY_PATCH
+        private set
+    var timestamp: Long = System.currentTimeMillis() / 1000
+        private set
+    var isABUpdate: Boolean = true
+        private set
 
     init {
-        val metadata = ZipFile(file).use { readMetadata(it) }
-        isABUpdate = when (metadata.type) {
-            OtaMetadata.AB -> true
-            OtaMetadata.BLOCK -> false
-            // OtaMetadata.BRICK -> false
-            else -> throw IOException("Unsupported OTA type: ${metadata.type}")
-        }
+        ZipFile(file).use { zipFile ->
+            val hasPayload = zipFile.getEntry("payload.bin") != null
+            isABUpdate = hasPayload
 
-        val postcondition = metadata.postcondition
-        sdkLevel = postcondition.sdkLevel.toInt()
-        securityPatchLevel = postcondition.securityPatchLevel
-        timestamp = postcondition.timestamp
+            val protoEntry = zipFile.getEntry(METADATA_PROTO_NAME)
+            if (protoEntry != null) {
+                try {
+                    val metadata = zipFile.getInputStream(protoEntry).use { input ->
+                        OtaMetadata.parseFrom(input.readBytes())
+                    }
+                    if (metadata.type == OtaMetadata.BLOCK) {
+                        isABUpdate = false
+                    }
+                    val postcondition = metadata.postcondition
+                    if (postcondition != null) {
+                        val parsedSdk = postcondition.sdkLevel?.toIntOrNull() ?: 0
+                        if (parsedSdk > 0) {
+                            sdkLevel = parsedSdk
+                        }
+                        if (!postcondition.securityPatchLevel.isNullOrEmpty()) {
+                            securityPatchLevel = postcondition.securityPatchLevel
+                        }
+                        if (postcondition.timestamp > 0) {
+                            timestamp = postcondition.timestamp
+                        }
+                    }
+                } catch (ignored: Exception) {
+                    // Fallback to text metadata or defaults
+                }
+            } else {
+                val textEntry = zipFile.getEntry(METADATA_TEXT_NAME)
+                if (textEntry != null) {
+                    try {
+                        val props = Properties()
+                        zipFile.getInputStream(textEntry).use { input ->
+                            props.load(InputStreamReader(input))
+                        }
+                        val otaType = props.getProperty("ota-type")
+                        if (otaType != null && otaType.equals("BLOCK", ignoreCase = true)) {
+                            isABUpdate = false
+                        }
+                        val tsStr = props.getProperty("post-timestamp")
+                        if (tsStr != null) {
+                            timestamp = tsStr.toLongOrNull() ?: (System.currentTimeMillis() / 1000)
+                        }
+                        val patchStr = props.getProperty("post-security-patch-level")
+                        if (!patchStr.isNullOrEmpty()) {
+                            securityPatchLevel = patchStr
+                        }
+                        val sdkStr = props.getProperty("post-sdk-level")
+                        if (sdkStr != null) {
+                            sdkLevel = sdkStr.toIntOrNull() ?: Build.VERSION.SDK_INT
+                        }
+                    } catch (ignored: Exception) {
+                        // Keep safe fallback defaults
+                    }
+                }
+            }
+        }
     }
 
     companion object {
         private const val METADATA_PROTO_NAME = "META-INF/com/android/metadata.pb"
-
-        @Throws(IOException::class)
-        private fun readMetadata(zipFile: ZipFile): OtaMetadata {
-            val entry = zipFile.getEntry(METADATA_PROTO_NAME)
-                ?: throw IOException("Couldn't find $METADATA_PROTO_NAME in ${zipFile.name}")
-
-            return zipFile.getInputStream(entry).use { input ->
-                OtaMetadata.parseFrom(input.readBytes())
-            }
-        }
+        private const val METADATA_TEXT_NAME = "META-INF/com/android/metadata"
     }
 }

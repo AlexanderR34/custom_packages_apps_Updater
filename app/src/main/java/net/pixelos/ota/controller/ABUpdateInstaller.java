@@ -190,10 +190,12 @@ class ABUpdateInstaller {
 
         long offset;
         String[] headerKeyValuePairs;
-        try {
-            ZipFile zipFile = new ZipFile(file);
-            offset = Utils.getZipEntryOffset(zipFile, Constants.AB_PAYLOAD_BIN_PATH);
+        try (ZipFile zipFile = new ZipFile(file)) {
+            offset = Utils.getZipEntryOffset(file, Constants.AB_PAYLOAD_BIN_PATH);
             ZipEntry payloadPropEntry = zipFile.getEntry(Constants.AB_PAYLOAD_PROPERTIES_PATH);
+            if (payloadPropEntry == null) {
+                throw new IllegalArgumentException("Payload properties entry not found");
+            }
             try (InputStream is = zipFile.getInputStream(payloadPropEntry);
                  InputStreamReader isr = new InputStreamReader(is);
                  BufferedReader br = new BufferedReader(isr)) {
@@ -204,7 +206,6 @@ class ABUpdateInstaller {
                 headerKeyValuePairs = new String[lines.size()];
                 headerKeyValuePairs = lines.toArray(headerKeyValuePairs);
             }
-            zipFile.close();
         } catch (IOException | IllegalArgumentException e) {
             Log.e(TAG, "Could not prepare " + file, e);
             mUpdaterController.markInstallationFailed(downloadId);
